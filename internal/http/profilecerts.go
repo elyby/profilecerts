@@ -136,10 +136,16 @@ func (s *ProfilesCertificatesApi) getPublicKeysHandler(c *gin.Context) {
 		return
 	}
 
+	encodedPublicKey, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		c.Error(fmt.Errorf("unable to encode public key: %w", err))
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"playerCertificateKeys": []map[string][]byte{
 			{
-				"publicKey": x509.MarshalPKCS1PublicKey(publicKey),
+				"publicKey": encodedPublicKey,
 			},
 		},
 	})
