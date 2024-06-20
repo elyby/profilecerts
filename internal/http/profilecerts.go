@@ -81,17 +81,21 @@ func (s *ProfilesCertificatesApi) getCertificatesHandler(c *gin.Context) {
 	profileCert, err := s.ProfileCertificatesService.GetKeypairForUser(c.Request.Context(), uuid)
 	if err != nil {
 		c.Error(fmt.Errorf("unable to retrieve a private key for user: %w", err))
+		return
 	}
+
+	privateKeyPKCS8, _ := x509.MarshalPKCS8PrivateKey(profileCert.Key)
 	privateKeyBlock := &pem.Block{
 		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(profileCert.Key),
+		Bytes: privateKeyPKCS8,
 	}
 	privateKeyPem := pem.EncodeToMemory(privateKeyBlock)
 
 	publicKey := &profileCert.Key.PublicKey
+	publicKeyPCIX, _ := x509.MarshalPKIXPublicKey(publicKey)
 	publicKeyBlock := &pem.Block{
 		Type:  "RSA PUBLIC KEY",
-		Bytes: x509.MarshalPKCS1PublicKey(publicKey),
+		Bytes: publicKeyPCIX,
 	}
 	publicKeyPem := pem.EncodeToMemory(publicKeyBlock)
 
@@ -136,16 +140,12 @@ func (s *ProfilesCertificatesApi) getPublicKeysHandler(c *gin.Context) {
 		return
 	}
 
-	encodedPublicKey, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		c.Error(fmt.Errorf("unable to encode public key: %w", err))
-		return
-	}
+	publicKeyPKIX, _ := x509.MarshalPKIXPublicKey(publicKey)
 
 	c.JSON(http.StatusOK, gin.H{
 		"playerCertificateKeys": []map[string][]byte{
 			{
-				"publicKey": encodedPublicKey,
+				"publicKey": publicKeyPKIX,
 			},
 		},
 	})
