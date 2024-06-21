@@ -99,23 +99,25 @@ func (s *ProfilesCertificatesApi) getCertificatesHandler(c *gin.Context) {
 	}
 	publicKeyPem := pem.EncodeToMemory(publicKeyBlock)
 
-	publicKeySignatureValue := fmt.Appendf(nil, "%d%s", profileCert.ExpiresAt.UnixMilli(), publicKeyPKIX)
-	publicKeySignature, err := s.SignerService.Sign(c.Request.Context(), publicKeySignatureValue)
+	pkV1buf := make([]byte, 0, len(publicKeyPKIX)+8) // key length + 8 bytes for timestamp
+	pkV1buf = binary.BigEndian.AppendUint64(pkV1buf, uint64(profileCert.ExpiresAt.UnixMilli()))
+	pkV1buf = append(pkV1buf, publicKeyPKIX...)
+
+	publicKeySignature, err := s.SignerService.Sign(c.Request.Context(), pkV1buf)
 	if err != nil {
 		c.Error(fmt.Errorf("unable to sign publicKeySignature: %w", err))
 		return
 	}
 
 	parsedUuid := uuidLib.MustParse(uuid)
-	publicKeySignatureV2Value := fmt.Appendf(
-		nil,
-		"%d%d%d%s",
-		binary.BigEndian.Uint64(parsedUuid[:8]), // Most significant bits
-		binary.BigEndian.Uint64(parsedUuid[8:]), // Least significant bits
-		profileCert.ExpiresAt.UnixMilli(),
-		publicKeyPKIX,
-	)
-	publicKeySignatureV2, err := s.SignerService.Sign(c.Request.Context(), publicKeySignatureV2Value)
+
+	pkV2buf := make([]byte, 0, len(publicKeyPKIX)+24) // key length + 8 bytes * (2 uuid parts + timestamp)
+	pkV2buf = binary.BigEndian.AppendUint64(pkV2buf, binary.BigEndian.Uint64(parsedUuid[:8])) // Most significant bits
+	pkV2buf = binary.BigEndian.AppendUint64(pkV2buf, binary.BigEndian.Uint64(parsedUuid[8:])) // Least significant bits
+	pkV2buf = binary.BigEndian.AppendUint64(pkV2buf, uint64(profileCert.ExpiresAt.UnixMilli()))
+	pkV2buf = append(pkV2buf, publicKeyPKIX...)
+
+	publicKeySignatureV2, err := s.SignerService.Sign(c.Request.Context(), pkV2buf)
 	if err != nil {
 		c.Error(fmt.Errorf("unable to sign publicKeySignatureV2: %w", err))
 		return
