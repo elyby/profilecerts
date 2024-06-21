@@ -92,14 +92,14 @@ func (s *ProfilesCertificatesApi) getCertificatesHandler(c *gin.Context) {
 	privateKeyPem := pem.EncodeToMemory(privateKeyBlock)
 
 	publicKey := &profileCert.Key.PublicKey
-	publicKeyPCIX, _ := x509.MarshalPKIXPublicKey(publicKey)
+	publicKeyPKIX, _ := x509.MarshalPKIXPublicKey(publicKey)
 	publicKeyBlock := &pem.Block{
 		Type:  "RSA PUBLIC KEY",
-		Bytes: publicKeyPCIX,
+		Bytes: publicKeyPKIX,
 	}
 	publicKeyPem := pem.EncodeToMemory(publicKeyBlock)
 
-	publicKeySignatureValue := fmt.Appendf(nil, "%d%s", profileCert.ExpiresAt.UnixMilli(), publicKeyBlock.Bytes)
+	publicKeySignatureValue := fmt.Appendf(nil, "%d%s", profileCert.ExpiresAt.UnixMilli(), publicKeyPKIX)
 	publicKeySignature, err := s.SignerService.Sign(c.Request.Context(), publicKeySignatureValue)
 	if err != nil {
 		c.Error(fmt.Errorf("unable to sign publicKeySignature: %w", err))
@@ -113,7 +113,7 @@ func (s *ProfilesCertificatesApi) getCertificatesHandler(c *gin.Context) {
 		binary.BigEndian.Uint64(parsedUuid[:8]), // Most significant bits
 		binary.BigEndian.Uint64(parsedUuid[8:]), // Least significant bits
 		profileCert.ExpiresAt.UnixMilli(),
-		publicKeyBlock.Bytes,
+		publicKeyPKIX,
 	)
 	publicKeySignatureV2, err := s.SignerService.Sign(c.Request.Context(), publicKeySignatureV2Value)
 	if err != nil {
