@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/pem"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	uuidLib "github.com/google/uuid"
+	"github.com/muesli/reflow/wrap"
 
 	"ely.by/profilecerts/internal/services/authreader"
 )
@@ -99,9 +101,13 @@ func (s *ProfilesCertificatesApi) getCertificatesHandler(c *gin.Context) {
 	}
 	publicKeyPem := pem.EncodeToMemory(publicKeyBlock)
 
-	pkV1buf := make([]byte, 0, len(publicKeyPKIX)+8) // key length + 8 bytes for timestamp
-	pkV1buf = binary.BigEndian.AppendUint64(pkV1buf, uint64(profileCert.ExpiresAt.UnixMilli()))
-	pkV1buf = append(pkV1buf, publicKeyPKIX...)
+	pkV1buf := make([]byte, 0, 512)
+	pkV1buf = fmt.Appendf(pkV1buf, "%d", profileCert.ExpiresAt.UnixMilli())
+	pkV1buf = append(pkV1buf, []byte("-----BEGIN RSA PUBLIC KEY-----\n")...)
+	pkV1keyBuf := make([]byte, base64.StdEncoding.EncodedLen(len(publicKeyPKIX)))
+	base64.StdEncoding.Encode(pkV1keyBuf, publicKeyPKIX)
+	pkV1buf = append(pkV1buf, wrap.Bytes(pkV1keyBuf, 76)...)
+	pkV1buf = append(pkV1buf, []byte("\n-----END RSA PUBLIC KEY-----\n")...)
 
 	publicKeySignature, err := s.SignerService.Sign(c.Request.Context(), pkV1buf)
 	if err != nil {
@@ -111,7 +117,7 @@ func (s *ProfilesCertificatesApi) getCertificatesHandler(c *gin.Context) {
 
 	parsedUuid := uuidLib.MustParse(uuid)
 
-	pkV2buf := make([]byte, 0, len(publicKeyPKIX)+24) // key length + 8 bytes * (2 uuid parts + timestamp)
+	pkV2buf := make([]byte, 0, len(publicKeyPKIX)+24)                                         // key length + 8 bytes * (2 uuid parts + timestamp)
 	pkV2buf = binary.BigEndian.AppendUint64(pkV2buf, binary.BigEndian.Uint64(parsedUuid[:8])) // Most significant bits
 	pkV2buf = binary.BigEndian.AppendUint64(pkV2buf, binary.BigEndian.Uint64(parsedUuid[8:])) // Least significant bits
 	pkV2buf = binary.BigEndian.AppendUint64(pkV2buf, uint64(profileCert.ExpiresAt.UnixMilli()))
