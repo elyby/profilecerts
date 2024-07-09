@@ -48,8 +48,8 @@ func NewProfileCertificatesApi(
 	profilesCertificatesService ProfileCertificatesService,
 	authReader AuthReader,
 	signerService SignerService,
-) ProfilesCertificatesApi {
-	return ProfilesCertificatesApi{
+) *ProfilesCertificatesApi {
+	return &ProfilesCertificatesApi{
 		ProfileCertificatesService: profilesCertificatesService,
 		AuthReader:                 authReader,
 		SignerService:              signerService,
@@ -151,6 +151,11 @@ func (s *ProfilesCertificatesApi) getPublicKeysHandler(c *gin.Context) {
 	publicKeyPKIX, _ := x509.MarshalPKIXPublicKey(publicKey)
 
 	c.JSON(http.StatusOK, gin.H{
+		"profilePropertyKeys": []map[string][]byte{
+			{
+				"publicKey": publicKeyPKIX,
+			},
+		},
 		"playerCertificateKeys": []map[string][]byte{
 			{
 				"publicKey": publicKeyPKIX,
