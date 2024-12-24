@@ -58,6 +58,7 @@ func NewProfileCertificatesApi(
 
 func (s *ProfilesCertificatesApi) DefineRoutes(r gin.IRouter) {
 	r.POST("/certificates", s.getCertificatesHandler)
+	r.POST("/player/certificates", s.getCertificatesHandler)
 	r.GET("/publickeys", s.getPublicKeysHandler)
 }
 
